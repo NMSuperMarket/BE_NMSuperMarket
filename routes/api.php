@@ -46,7 +46,12 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/dashboard/stats', [OrganizerEventController::class, 'getDashboardStats']);
         Route::get('/dashboard/events', [OrganizerEventController::class, 'getRecentEvents']);
         Route::get('/events', [OrganizerEventController::class, 'index']);
+        Route::post('/events', [OrganizerEventController::class, 'store']);
         Route::get('/events/{id}', [OrganizerEventController::class, 'show']);
+        Route::put('/events/{id}', [OrganizerEventController::class, 'update']);
+        Route::delete('/events/{id}', [OrganizerEventController::class, 'destroy']);
+        Route::post('/events/{id}/publish', [OrganizerEventController::class, 'publish']);
+        Route::post('/events/{id}/cancel', [OrganizerEventController::class, 'cancel']);
     });
 
     // Attendee Dashboard routes (REQ_11)

@@ -146,6 +146,9 @@ class OrganizerEventController extends Controller
                 'status' => $event->status,
                 'created_at' => $event->created_at->format('d/m/Y'),
                 'category_name' => $event->category ? $event->category->name : 'N/A',
+                'category_id' => $event->category_id,
+                'image' => $event->image,
+                'registration_deadline' => $event->registration_deadline,
 
                 // Số lượng tổng quan để hiển thị ở khối Widget bên phải
                 'confirmed_count' => $confirmedList->count(),
@@ -156,5 +159,128 @@ class OrganizerEventController extends Controller
                 'waitlist_users' => $waitlistList
             ]
         ], 200);
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'start_time' => 'required|date',
+            'end_time' => 'required|date|after:start_time',
+            'registration_deadline' => 'required|date|before_or_equal:start_time',
+            'location' => 'required|string|max:255',
+            'capacity' => 'required|integer|min:1',
+            'category_id' => 'required|exists:categories,id',
+            'image' => 'nullable|string'
+        ]);
+
+        $validated['organizer_id'] = $request->user()->id;
+        $validated['status'] = 'draft';
+
+        $event = Event::create($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tạo sự kiện bản nháp thành công',
+            'data' => $event
+        ]);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $event = Event::where('organizer_id', $request->user()->id)->findOrFail($id);
+
+        if ($event->status === 'published' || $event->status === 'cancelled') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sự kiện đã Public hoặc đã Hủy không thể chỉnh sửa thông tin'
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'title' => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string',
+            'start_time' => 'sometimes|required|date',
+            'end_time' => 'sometimes|required|date|after:start_time',
+            'registration_deadline' => 'sometimes|required|date|before_or_equal:start_time',
+            'location' => 'sometimes|required|string|max:255',
+            'capacity' => 'sometimes|required|integer|min:1',
+            'category_id' => 'sometimes|required|exists:categories,id',
+            'image' => 'nullable|string'
+        ]);
+
+        $event->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cập nhật sự kiện thành công',
+            'data' => $event
+        ]);
+    }
+
+    public function publish(Request $request, $id)
+    {
+        $event = Event::where('organizer_id', $request->user()->id)->findOrFail($id);
+
+        if ($event->status !== 'draft') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Chỉ có thể Publish sự kiện đang ở trạng thái Draft'
+            ], 400);
+        }
+
+        $event->update([
+            'status' => 'published',
+            'published_at' => now()
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã xuất bản sự kiện',
+            'data' => $event
+        ]);
+    }
+
+    public function cancel(Request $request, $id)
+    {
+        $event = Event::where('organizer_id', $request->user()->id)->findOrFail($id);
+
+        if ($event->status !== 'published') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Chỉ có thể Hủy sự kiện đang Published'
+            ], 400);
+        }
+
+        $event->update([
+            'status' => 'cancelled',
+            'cancelled_at' => now(),
+            'cancel_reason' => $request->input('cancel_reason', '')
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sự kiện đã bị hủy'
+        ]);
+    }
+
+    public function destroy(Request $request, $id)
+    {
+        $event = Event::where('organizer_id', $request->user()->id)->findOrFail($id);
+
+        if ($event->status !== 'draft') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Chỉ được phép xóa sự kiện ở trạng thái Draft'
+            ], 403);
+        }
+
+        $event->delete(); // Soft delete
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Xóa sự kiện thành công'
+        ]);
     }
 }
