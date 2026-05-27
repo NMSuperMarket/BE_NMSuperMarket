@@ -31,7 +31,8 @@ class ProductController extends Controller
             });
         }
 
-        $products = $query->orderBy('id', 'desc')->paginate(12);
+        $perPage = min((int) $request->get('per_page', 12), 200); // tối đa 200
+        $products = $query->orderBy('id', 'desc')->paginate($perPage);
 
         return response()->json([
             'success' => true,
