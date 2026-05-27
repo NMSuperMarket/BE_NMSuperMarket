@@ -102,7 +102,14 @@ Trình bày câu trả lời của bạn BẮT BUỘC dưới dạng JSON object
             }
 
             $response = Http::timeout(30)
-                ->withoutVerifying()
+                ->withOptions([
+                    'verify' => false,
+                    'curl' => [
+                        CURLOPT_SSL_VERIFYPEER => false,
+                        CURLOPT_SSL_VERIFYHOST => 0,
+                        CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
+                    ]
+                ])
                 ->withToken($this->apiKey)
                 ->withHeaders(['Content-Type' => 'application/json'])
                 ->post($this->apiUrl, $payload);
