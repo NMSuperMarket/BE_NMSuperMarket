@@ -1,44 +1,64 @@
 <?php
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\Model;
 use App\Models\Category;
-use App\Models\Event;
+use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
-   public function index()
-{
-
-    $categories = Category::withCount('events')->get();
-
-    return response()->json([
-        'success' => true,
-        'data' => $categories
-    ]);
-}
-
-    public function getEvents($id)
-{
-     $category = Category::find($id);
-
-    if (!$category) {
+    // Lấy danh sách danh mục (Public/Admin)
+    public function index()
+    {
+        $categories = Category::where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+            
         return response()->json([
-            'success' => false,
-            'message' => 'Không tìm thấy danh mục này!'
-        ], 404);
+            'success' => true,
+            'data' => $categories
+        ]);
     }
 
+    // Admin: Thêm danh mục
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'slug' => 'required|string|max:120|unique:categories,slug',
+            'description' => 'nullable|string',
+            'icon' => 'nullable|string|max:100',
+            'sort_order' => 'integer'
+        ]);
 
-    $events = Event::where('category_id', $id)
-                   ->where('status', 'published')
-                   ->get();
+        $category = Category::create($validated);
 
-    return response()->json([
-        'success' => true,
-        'category_name' => $category->name,
-        'data' => $events
-    ]);
-}
+        return response()->json([
+            'success' => true,
+            'data' => $category,
+            'message' => 'Tạo danh mục thành công'
+        ], 201);
+    }
+
+    // Admin: Sửa danh mục
+    public function update(Request $request, $id)
+    {
+        $category = Category::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => 'string|max:100',
+            'slug' => 'string|max:120|unique:categories,slug,' . $id,
+            'description' => 'nullable|string',
+            'icon' => 'nullable|string|max:100',
+            'sort_order' => 'integer',
+            'is_active' => 'boolean'
+        ]);
+
+        $category->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'data' => $category,
+            'message' => 'Cập nhật thành công'
+        ]);
+    }
 }

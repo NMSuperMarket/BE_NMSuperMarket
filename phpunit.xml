@@ -26,7 +26,7 @@
         <env name="DB_CONNECTION" value="mysql"/>
         <env name="DB_HOST" value="127.0.0.1"/>
         <env name="DB_PORT" value="3306"/>
-        <env name="DB_DATABASE" value="dana_event_spark_test"/>
+        <env name="DB_DATABASE" value="nmsupermarket_test"/>
         <env name="DB_USERNAME" value="root"/>
         <env name="DB_PASSWORD" value=""/>
         <env name="JWT_SECRET" value="3wE9B4f7D8g3H2j1K9m0N2p8Q7r6S5t4U3v2W1x0Y9z8A7b6C5d4E3f2G1h0J9k8"/>

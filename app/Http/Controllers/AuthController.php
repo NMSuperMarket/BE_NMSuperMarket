@@ -2,109 +2,120 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\AuthService;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-    protected AuthService $authService;
-
-    public function __construct(AuthService $authService)
-    {
-        $this->authService = $authService;
-    }
-
+    /**
+     * Register a new user
+     */
     public function register(Request $request)
     {
-        $data = $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8',
-            'phone'    => 'nullable|string|max:15',
-            'role'     => 'in:attendee,organizer',
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:100',
+            'username' => 'required|string|max:50|unique:users',
+            'email' => 'required|string|email|max:150|unique:users',
+            'phone' => 'nullable|string|max:20|unique:users',
+            'password' => 'required|string|min:6|confirmed',
         ]);
 
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
 
-        $result = $this->authService->register($data);
+        $user = User::create([
+            'name' => $request->name,
+            'username' => $request->username,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'password' => Hash::make($request->password),
+            'role' => 'customer',
+            'is_active' => true,
+        ]);
 
-        return response()->json([
-            'status'  => 'success',
-            'message' => 'Đăng ký thành công',
-            'data'    => [
-                'user'       => $result['user'],
-                'token'      => $result['token'],
-                'token_type' => 'Bearer',
-            ],
-        ], 201);
+        $token = auth('api')->login($user);
+
+        return $this->respondWithToken($token, $user);
     }
 
+    /**
+     * Handle Login (Email, Username, or Phone)
+     */
     public function login(Request $request)
     {
-        $data = $request->validate([
-            'email'    => 'required|string|email',
+        $request->validate([
+            'identifier' => 'required|string', // can be email, username, or phone
             'password' => 'required|string',
         ]);
 
-        try {
-            $result = $this->authService->login($data);
+        $identifier = $request->identifier;
+        $field = filter_var($identifier, FILTER_VALIDATE_EMAIL) ? 'email' : (is_numeric($identifier) ? 'phone' : 'username');
 
-            return response()->json([
-                'status'  => 'success',
-                'message' => 'Đăng nhập thành công',
-                'data'    => [
-                    'user'       => $result['user'],
-                    'token'      => $result['token'],
-                    'token_type' => 'Bearer',
-                ],
-            ], 200);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => $e->errors()['email'][0] ?? 'Email hoặc mật khẩu không đúng',
-            ], 401);
+        $credentials = [
+            $field => $identifier,
+            'password' => $request->password,
+        ];
+
+        if (! $token = auth('api')->attempt($credentials)) {
+            return response()->json(['success' => false, 'error' => 'Thông tin đăng nhập không chính xác'], 401);
         }
+
+        $user = auth('api')->user();
+
+        if (!$user->is_active) {
+            auth('api')->logout();
+            return response()->json(['success' => false, 'error' => 'Tài khoản của bạn đã bị khóa'], 403);
+        }
+
+        return $this->respondWithToken($token, $user);
     }
 
-    public function googleLogin(Request $request)
+    /**
+     * Get the authenticated User.
+     */
+    public function me()
     {
-        $data = $request->validate([
-            'email'     => 'required|string|email',
-            'name'      => 'required|string',
-            'google_id' => 'required|string',
-            'avatar'    => 'nullable|string',
+        return response()->json([
+            'success' => true,
+            'data' => auth('api')->user()
         ]);
-
-        $result = $this->authService->googleLogin($data);
-
-        return response()->json([
-            'status'  => 'success',
-            'message' => 'Đăng nhập thành công',
-            'data'    => [
-                'user'       => $result['user'],
-                'token'      => $result['token'],
-                'token_type' => 'Bearer',
-            ],
-        ], 200);
     }
 
-    public function logout(Request $request)
+    /**
+     * Log the user out (Invalidate the token).
+     */
+    public function logout()
     {
-        $this->authService->logout($request->user());
+        auth('api')->logout();
 
-        return response()->json([
-            'status'  => 'success',
-            'message' => 'Đăng xuất thành công',
-        ], 200);
+        return response()->json(['success' => true, 'message' => 'Successfully logged out']);
     }
 
-    public function me(Request $request)
+    /**
+     * Refresh a token.
+     */
+    public function refresh()
+    {
+        return $this->respondWithToken(auth('api')->refresh());
+    }
+
+    /**
+     * Get the token array structure.
+     */
+    protected function respondWithToken($token, $user = null)
     {
         return response()->json([
-            'status' => 'success',
-            'data'   => [
-                'user' => $request->user()->load('role'),
-            ],
-        ], 200);
+            'success' => true,
+            'access_token' => $token,
+            'token_type' => 'bearer',
+            'expires_in' => auth('api')->factory()->getTTL() * 60,
+            'user' => $user ?? auth('api')->user()
+        ]);
     }
 }

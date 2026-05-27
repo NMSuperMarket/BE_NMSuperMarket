@@ -1,21 +1,14 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Category extends Model
 {
-    use HasFactory;
+    protected $fillable = ['name', 'slug', 'description', 'icon', 'image', 'sort_order', 'is_active'];
 
-    protected $table = 'categories';
-    public $timestamps = false;
-    protected $fillable = ['name', 'image'];
-
-    public function events(): HasMany
+    public function products()
     {
-        return $this->hasMany(Event::class, 'category_id');
+        return $this->hasMany(Product::class);
     }
 }

@@ -1,64 +1,71 @@
 <?php
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\EventController;
-use App\Http\Controllers\RegistrationController;
-use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\CartController;
+use App\Http\Controllers\OrderController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ChatbotController;
+use App\Http\Controllers\InventoryController;
 
-// Auth routes (REQ_01 + REQ_02)
-Route::prefix('auth')->group(function () {
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/google', [AuthController::class, 'googleLogin']);
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+*/
 
-    Route::middleware('auth:api')->group(function () {
-        Route::post('/logout', [AuthController::class, 'logout']);
-        Route::get('/me', [AuthController::class, 'me']);
+// Xác thực (Auth)
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register']);
+
+// Upload API
+use App\Http\Controllers\UploadController;
+Route::post('/upload', [UploadController::class, 'upload'])->middleware('auth:api');
+
+// Public (Cho người dùng chưa đăng nhập)
+Route::get('/categories', [CategoryController::class, 'index']);
+Route::get('/products', [ProductController::class, 'index']);
+Route::get('/products/{id}', [ProductController::class, 'show']);
+Route::post('/chatbot', [ChatbotController::class, 'chat']);
+
+// Yêu cầu đăng nhập (Customer Routes)
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('/me', [AuthController::class, 'me']);
+    Route::post('/logout', [AuthController::class, 'logout']);
+
+    Route::prefix('customer')->group(function () {
+        Route::get('/cart', [CartController::class, 'getCart']);
+        Route::post('/cart', [CartController::class, 'addToCart']);
+        Route::put('/cart/{id}', [CartController::class, 'updateCart']);
+        Route::delete('/cart/{id}', [CartController::class, 'removeFromCart']);
+        
+        Route::post('/checkout', [OrderController::class, 'checkout']);
+        Route::get('/orders', [OrderController::class, 'myOrders']);
     });
 });
 
-// System Stats (REQ_06 + REQ_08)
-Route::get('/system-stats', [EventController::class, 'getSystemStats']);
-
-// Event List — search, filter, paginate (REQ_06 + REQ_08)
-Route::get('/events', [EventController::class, 'index']);
-
-// Event Detail (REQ_09)
-Route::get('/events/{id}', [EventController::class, 'show']);
-Route::get('/events/{id}/reviews/stream', [ReviewController::class, 'stream']);
-
-// Categories (REQ_13)
-Route::get('/categories', [CategoryController::class, 'index']);
-Route::get('/categories/{id}/events', [CategoryController::class, 'getEvents']);
-
-use App\Http\Controllers\OrganizerEventController;
-use App\Http\Controllers\AttendeeController;
-
-// Protected routes
-Route::middleware('auth:api')->group(function () {
-    Route::post('/events/{id}/register', [RegistrationController::class, 'store']);
-    Route::post('/events/{id}/reviews', [ReviewController::class, 'store']);
-
-    // Organizer Dashboard routes
-    Route::prefix('organizer')->group(function () {
-        Route::get('/dashboard/stats', [OrganizerEventController::class, 'getDashboardStats']);
-        Route::get('/dashboard/events', [OrganizerEventController::class, 'getRecentEvents']);
-        Route::get('/events', [OrganizerEventController::class, 'index']);
-        Route::post('/events', [OrganizerEventController::class, 'store']);
-        Route::get('/events/{id}', [OrganizerEventController::class, 'show']);
-        Route::put('/events/{id}', [OrganizerEventController::class, 'update']);
-        Route::delete('/events/{id}', [OrganizerEventController::class, 'destroy']);
-        Route::post('/events/{id}/publish', [OrganizerEventController::class, 'publish']);
-        Route::post('/events/{id}/cancel', [OrganizerEventController::class, 'cancel']);
-    });
-
-    // Attendee Dashboard routes (REQ_11)
-    Route::prefix('attendee')->group(function () {
-        Route::get('/dashboard/stats', [AttendeeController::class, 'getDashboardStats']);
-        Route::get('/dashboard/registrations', [AttendeeController::class, 'getRegistrations']);
-        Route::get('/dashboard/waitlist', [AttendeeController::class, 'getWaitlist']);
-        Route::get('/dashboard/cancelled', [AttendeeController::class, 'getCancelledRegistrations']);
-    });
+// Admin Routes (Yêu cầu đăng nhập & quyền Admin)
+Route::middleware(['auth:api', 'role:admin'])->prefix('admin')->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'getStats']);
+    
+    // Quản lý Danh mục
+    Route::post('/categories', [CategoryController::class, 'store']);
+    Route::put('/categories/{id}', [CategoryController::class, 'update']);
+    
+    // Quản lý Sản phẩm
+    Route::get('/products', [ProductController::class, 'adminIndex']);
+    Route::post('/products', [ProductController::class, 'store']);
+    Route::put('/products/{id}', [ProductController::class, 'update']);
+    Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+    
+    // Quản lý Đơn hàng
+    Route::get('/orders', [OrderController::class, 'adminIndex']);
+    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+    
+    // Quản lý Tồn kho
+    Route::get('/inventory', [InventoryController::class, 'index']);
+    Route::put('/inventory/{id}', [InventoryController::class, 'update']);
 });
