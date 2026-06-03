@@ -16,12 +16,17 @@ class ChatbotController extends Controller
 
     public function chat(Request $request)
     {
-        $request->validate([
-            'message' => 'required|string|max:500',
-            'history' => 'nullable|array|max:20',
-            'history.*.role' => 'required|in:user,model',
-            'history.*.content' => 'required|string'
-        ]);
+        try {
+            $request->validate([
+                'message' => 'required|string|max:500',
+                'history' => 'nullable|array|max:100',
+                'history.*.role' => 'required|string',
+                'history.*.content' => 'required|string'
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Illuminate\Support\Facades\Log::error('Validation failed: ' . json_encode($e->errors()) . ' | Request data: ' . json_encode($request->all()));
+            throw $e;
+        }
 
         $message = $request->input('message');
         $history = $request->input('history', []);
